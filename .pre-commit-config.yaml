@@ -1,0 +1,8 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      # Dùng binary gitleaks đã cài trong PATH, không build Go trong giờ lab.
+      - id: gitleaks-system
+        # Gitleaks quét cả repo, không nhận từng tên file làm tham số.
+        pass_filenames: false

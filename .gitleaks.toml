@@ -8,3 +8,12 @@ id = "lab24-synthetic-token"
 description = "A deliberately invalid lab token; never use real credentials"
 regex = '''LAB24_FAKE_TOKEN=LAB24-DEMO-[A-Z0-9]{16}'''
 keywords = ["LAB24_FAKE_TOKEN"]
+
+# CP4: lần quét `gitleaks dir` đầu báo generic-api-key ở
+# .venv/Lib/site-packages/setuptools/_distutils/msvccompiler.py:45
+# (`RegEnumKey = win32api.RegEnumKey`, tên hàm, không phải secret).
+# Chỉ bỏ qua thư mục virtualenv cục bộ (.venv/ đã nằm trong .gitignore);
+# không tắt rule nào và không bỏ qua phần còn lại của repo.
+[[allowlists]]
+description = "Thư viện bên thứ ba trong virtualenv cục bộ .venv/, không phải code bài lab"
+paths = ['''(?:^|/)\.venv/''']

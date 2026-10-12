@@ -30,10 +30,45 @@ set ở tests/vn_pii_testset.jsonl):
 """
 from __future__ import annotations
 
+import re
+
+# STK chỉ nhận khi có nhãn đứng ngay trước ("STK", "số tài khoản", "tài
+# khoản"): 8-16 chữ số trần trùng với CCCD (12 số) và SĐT (10 số), nên không
+# có nhãn thì không đủ căn cứ gọi là STK. Group 1 là phần số cần che.
+_BANK_RE = re.compile(
+    r"(?:\bSTK|\bs[ốo] t[àa]i kho[ảa]n|\bt[àa]i kho[ảa]n)\s*[:#]?\s*(\d{8,16})(?!\d)",
+    re.IGNORECASE,
+)
+_EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")
+# CCCD: đúng 12 chữ số liền nhau, không dính chữ số khác ở hai đầu.
+_CCCD_RE = re.compile(r"(?<!\d)\d{12}(?!\d)")
+# SĐT: 0 (hoặc +84) rồi 9-10 chữ số, cho phép dấu cách/chấm/gạch giữa các số.
+_PHONE_RE = re.compile(r"(?<![\d+])(?:\+84|0)(?:[ .-]?\d){9,10}(?!\d)")
+
+# Thứ tự = độ ưu tiên khi hai vùng chồng nhau: STK có nhãn thắng CCCD/SĐT
+# (vd "STK 421740666891" là 12 số nhưng là tài khoản), email đứng trước số.
+_RECOGNIZERS = (
+    ("VN_BANK_ACCOUNT", _BANK_RE, 1),
+    ("EMAIL", _EMAIL_RE, 0),
+    ("VN_CCCD", _CCCD_RE, 0),
+    ("VN_PHONE", _PHONE_RE, 0),
+)
+
 
 def detect(text: str) -> list[dict]:
-    raise NotImplementedError("BƯỚC 3a: implement PII detection")
+    entities: list[dict] = []
+    for pii_type, pattern, group in _RECOGNIZERS:
+        for match in pattern.finditer(text):
+            start, end = match.span(group)
+            # Vùng đã được loại ưu tiên cao hơn nhận thì bỏ, tránh báo hai lần.
+            if any(start < e["end"] and e["start"] < end for e in entities):
+                continue
+            entities.append({"type": pii_type, "start": start, "end": end})
+    return sorted(entities, key=lambda e: e["start"])
 
 
 def redact(text: str) -> str:
-    raise NotImplementedError("BƯỚC 3a: implement PII redaction")
+    # Thay từ cuối về đầu để offset của các vùng phía trước không bị lệch.
+    for entity in sorted(detect(text), key=lambda e: e["start"], reverse=True):
+        text = text[: entity["start"]] + f"[REDACTED_{entity['type']}]" + text[entity["end"]:]
+    return text
